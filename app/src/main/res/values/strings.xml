@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">ProotBox</string>
+    <string name="nav_containers">Containers</string>
+    <string name="nav_installer">Instalar</string>
+    <string name="nav_terminal">Terminal</string>
+    <string name="nav_display">Wayland / VNC</string>
+    <string name="distro_input_hint">Digite uma distro (ex: ubuntu, alpine, debian, arch, kali) ou URL...</string>
+    <string name="proot_status_title">Motor PRoot</string>
+    <string name="download_proot">Baixar Binários PRoot</string>
+    <string name="wayland_compositor">Compositor Wayland</string>
+    <string name="vnc_viewer">Visualizador VNC</string>
+</resources>

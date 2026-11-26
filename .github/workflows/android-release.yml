@@ -1,0 +1,105 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build ProotBox APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Prepare signing keystores & .env
+        shell: bash
+        run: |
+          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+            cp .env.example .env
+          fi
+
+          if [ ! -f "debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-upload-key.jks
+          elif [ ! -f "my-upload-key.jks" ]; then
+            keytool -genkeypair -v \
+              -keystore my-upload-key.jks \
+              -storepass "${{ secrets.STORE_PASSWORD || 'prootbox-ci-pass' }}" \
+              -alias upload \
+              -keypass "${{ secrets.KEY_PASSWORD || 'prootbox-ci-pass' }}" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=ProotBox,O=ProotBox,C=BR"
+          fi
+
+      - name: Setup Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Build Debug & Release APKs
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'prootbox-ci-pass' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'prootbox-ci-pass' }}
+        run: gradle assembleDebug assembleRelease --no-daemon
+
+      - name: Collect APKs for release
+        shell: bash
+        run: |
+          mkdir -p release-apks
+          cp app/build/outputs/apk/debug/app-debug.apk release-apks/ProotBox-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk release-apks/ProotBox-release.apk
+          ls -lh release-apks/
+
+      - name: Upload APK build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProotBox-APKs
+          path: release-apks/*.apk
+
+      - name: Publish GitHub Release with APKs
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('ProotBox {0}', github.ref_name) || format('ProotBox Build #{0}', github.run_number) }}
+          generate_release_notes: true
+          files: |
+            release-apks/ProotBox-release.apk
+            release-apks/ProotBox-debug.apk

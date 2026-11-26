@@ -1,0 +1,6 @@
+{
+  "name": "ProotBox",
+  "description": "Linux PRoot container manager with custom distro rootfs installer, granular package selection, built-in ANSI terminal, real Wayland compositor, and integrated VNC viewer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
