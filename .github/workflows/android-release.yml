@@ -25,11 +25,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -79,13 +79,24 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'prootbox-ci-pass' }}
         run: gradle assembleDebug assembleRelease --no-daemon
 
-      - name: Collect APKs for release
+      - name: Collect APKs & Release Metadata
+        id: release_meta
         shell: bash
         run: |
           mkdir -p release-apks
           cp app/build/outputs/apk/debug/app-debug.apk release-apks/ProotBox-debug.apk
           cp app/build/outputs/apk/release/app-release.apk release-apks/ProotBox-release.apk
           ls -lh release-apks/
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+            REL_NAME="ProotBox ${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="build-${GITHUB_RUN_NUMBER}"
+            REL_NAME="ProotBox Build ${GITHUB_RUN_NUMBER}"
+          fi
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_name=${REL_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK build artifacts
         uses: actions/upload-artifact@v4
@@ -97,8 +108,8 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && format('ProotBox {0}', github.ref_name) || format('ProotBox Build #{0}', github.run_number) }}
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          name: ${{ steps.release_meta.outputs.release_name }}
           generate_release_notes: true
           files: |
             release-apks/ProotBox-release.apk
